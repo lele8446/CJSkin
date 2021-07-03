@@ -9,7 +9,7 @@ pod  'CJSkin'  #pod导入
 #import "CJSkin.h"
 ```
 
-#### 静态换肤
+#### 一、静态换肤
 
 ```objc
 UIButton *button = [UIButton new];
@@ -18,18 +18,18 @@ button.backgroundColor = SkinColor(@"背景色");
 button.titleLabel.font = SkinFont(@"标题");
 ```
 
-#### 动态换肤
+#### 二、动态换肤
 
-- 方法转发
+- 方法一：使用方法转发
 
   ```objc
   UIButton *button = [UIButton new];
-      [button CJSkinInvokeMethodForSelector:@selector(setBackgroundColor:) withArguments:@[SkinColorTool(@"背景色")]];
-      [button CJSkinInvokeMethodForSelector:@selector(setImage:forState:) withArguments:@[SkinImageTool(@"按钮"),@(UIControlStateNormal)]];
-      [button.titleLabel CJSkinInvokeMethodForSelector:@selector(setFont:) withArguments:@[SkinFontTool(@"标题")]];
+  [button CJSkinInvokeMethodForSelector:@selector(setBackgroundColor:) withArguments:@[SkinColorTool(@"背景色")]];
+  [button CJSkinInvokeMethodForSelector:@selector(setImage:forState:) withArguments:@[SkinImageTool(@"按钮"),@(UIControlStateNormal)]];
+  [button.titleLabel CJSkinInvokeMethodForSelector:@selector(setFont:) withArguments:@[SkinFontTool(@"标题")]];
   ```
 
-- 换肤block
+- 方法二：使用skinChangeBlock
 
   ```objc
   //换肤设置示例
@@ -40,6 +40,22 @@ button.titleLabel.font = SkinFont(@"标题");
       [weakSelf setImage:SkinImage(@"按钮高亮") forState:UIControlStateHighlighted];
   };
   ```
+
+#### 三、皮肤资源说明
+
+换肤资源使用 **CJSkin.plist** 文件（文件名固定）来配置管理换肤信息。如下图所示：当前项目的CJSkin.plist文件内记录了default、skin1、skin2三个皮肤包，每个皮肤包内固定包含`Color`、`Image`、`Font`（颜色、图片、字体）三类皮肤元素的信息。
+
+不同皮肤包 **Color** 字典中的key相同值不同：比如default皮肤包中 `导航背景色` 值为0x996666，skin2皮肤包中 `导航背景色` 的值为0x454545。
+
+**Image** 的说明同理，比如default和skin2皮肤包中都有 `顶部图片` ，但分别指向了不同的url；另外不同皮肤包的图片还可以放到各自的default.bundle、skin1.bundle文件夹内，同时在CJSkin.plist中声明图片别名，比如skin1.bundle中包含图片top.png，它在CJSkin.plist的配置为“ `顶部图片 : top.png` ”。
+
+ **Font** 的配置说明也是一样，不同皮肤包的key相同，值为包含Name、Size两个固定key的字典，Name为空则使用系统默认字体，Size表示了字号大小。
+
+![CJSkin.plist](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/CJSkin.png)
+
+![换肤资源管理](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/%E6%8D%A2%E8%82%A4%E8%B5%84%E6%BA%90%E7%AE%A1%E7%90%862.jpg)
+
+
 
 ### 组件模块说明
 
@@ -53,18 +69,6 @@ button.titleLabel.font = SkinFont(@"标题");
 
   
 
-###CJSkin概述
+### CJSkin换肤流程
 
-CJSkin换肤组件包含UI元素样式的颜色、图片、字体切换。支持动态换肤（换肤后即刻生效），以及静态换肤（需页面重载、APP重启）。
-
-* 换肤流程
-
-  ![换肤流程](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/%E6%8D%A2%E8%82%A4%E6%B5%81%E7%A8%8B1.jpg)
-
-* 资源管理
-
-  资源管理采用plist文件来记录所有换肤资源的配置信息，plist文件其实就是一个字典文件，该文件的数据结构分为三级，最外层**字典1**的`key`为皮肤包名，值为`NSDictionary`类型的**皮肤包字典2**；**皮肤包字典2**内包含三个固定key：`Color`、`Image`、`Font`，分别对应颜色图片字体三种皮肤资源，它们的值同样是字典称它为**元素字典3**；不同皮肤包下**元素字典3**的key值保持相同，只是对应值不同，以颜色为例：不同皮肤包的颜色分类下都含有**`导航背景色`**，并对应各自不同的颜色色值。详情见下图：
-
-  ![CJSkin.plist](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/CJSkin.png)
-
-  ![换肤资源管理](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/%E6%8D%A2%E8%82%A4%E8%B5%84%E6%BA%90%E7%AE%A1%E7%90%862.jpg)
+![换肤流程](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/%E6%8D%A2%E8%82%A4%E6%B5%81%E7%A8%8B1.jpg)
