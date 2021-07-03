@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="15505" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="15510"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="CJNextViewController">
+            <connections>
+                <outlet property="button" destination="Kik-vR-pTv" id="94Q-UD-MzV"/>
+                <outlet property="searchBar" destination="Qev-uT-wWO" id="KSW-hS-5QF"/>
+                <outlet property="view" destination="i5M-Pr-FkT" id="sfx-zR-JGt"/>
+            </connections>
+        </placeholder>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view clearsContextBeforeDrawing="NO" contentMode="scaleToFill" id="i5M-Pr-FkT">
+            <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <searchBar contentMode="redraw" translatesAutoresizingMaskIntoConstraints="NO" id="Qev-uT-wWO">
+                    <rect key="frame" x="15" y="30" width="345" height="56"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="56" id="w6b-eg-Tnr"/>
+                    </constraints>
+                    <textInputTraits key="textInputTraits"/>
+                </searchBar>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="hRO-PT-Jex">
+                    <rect key="frame" x="152" y="101" width="71" height="30"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="30" id="FaF-Qh-9sC"/>
+                    </constraints>
+                    <state key="normal" title="删除皮肤2"/>
+                    <connections>
+                        <action selector="clearSkin:" destination="-1" eventType="touchUpInside" id="Oyo-iM-THA"/>
+                    </connections>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="zYe-GJ-2Td">
+                    <rect key="frame" x="152" y="146" width="71" height="30"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="30" id="nCv-JZ-tzc"/>
+                    </constraints>
+                    <state key="normal" title="添加皮肤2"/>
+                    <connections>
+                        <action selector="updateSkin:" destination="-1" eventType="touchUpInside" id="wFd-Sl-LIW"/>
+                    </connections>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" adjustsImageWhenDisabled="NO" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="tUq-DZ-mWD">
+                    <rect key="frame" x="168.5" y="191" width="38" height="30"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="30" id="q5l-p8-rqo"/>
+                    </constraints>
+                    <state key="normal" title="测试1"/>
+                    <connections>
+                        <action selector="test1:" destination="-1" eventType="touchUpInside" id="ei7-ae-zP6"/>
+                    </connections>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="h0n-zz-Hyu">
+                    <rect key="frame" x="167.5" y="236" width="40" height="30"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="30" id="gXx-WV-SqL"/>
+                    </constraints>
+                    <state key="normal" title="测试2"/>
+                    <connections>
+                        <action selector="test2:" destination="-1" eventType="touchUpInside" id="SHC-57-FkP"/>
+                    </connections>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Kik-vR-pTv">
+                    <rect key="frame" x="30" y="302" width="315" height="45"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="45" id="Ukl-MQ-7qP"/>
+                    </constraints>
+                </button>
+            </subviews>
+            <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <constraints>
+                <constraint firstItem="Qev-uT-wWO" firstAttribute="top" secondItem="i5M-Pr-FkT" secondAttribute="top" constant="30" id="6uL-lo-yfn"/>
+                <constraint firstItem="h0n-zz-Hyu" firstAttribute="top" secondItem="tUq-DZ-mWD" secondAttribute="bottom" constant="15" id="A55-pS-hM1"/>
+                <constraint firstItem="Qev-uT-wWO" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leading" constant="15" id="AdF-BW-WYT"/>
+                <constraint firstItem="hRO-PT-Jex" firstAttribute="centerX" secondItem="i5M-Pr-FkT" secondAttribute="centerX" id="EhR-yZ-FU6"/>
+                <constraint firstItem="zYe-GJ-2Td" firstAttribute="top" secondItem="hRO-PT-Jex" secondAttribute="bottom" constant="15" id="HYZ-MF-rkq"/>
+                <constraint firstAttribute="trailing" secondItem="Kik-vR-pTv" secondAttribute="trailing" constant="30" id="VSo-yg-coG"/>
+                <constraint firstItem="hRO-PT-Jex" firstAttribute="top" secondItem="Qev-uT-wWO" secondAttribute="bottom" constant="15" id="XdW-yV-Js6"/>
+                <constraint firstAttribute="trailing" secondItem="Qev-uT-wWO" secondAttribute="trailing" constant="15" id="a7I-fp-ZvL"/>
+                <constraint firstItem="h0n-zz-Hyu" firstAttribute="centerX" secondItem="i5M-Pr-FkT" secondAttribute="centerX" id="hNG-WQ-lud"/>
+                <constraint firstItem="zYe-GJ-2Td" firstAttribute="centerX" secondItem="i5M-Pr-FkT" secondAttribute="centerX" id="hsg-zA-CPD"/>
+                <constraint firstItem="tUq-DZ-mWD" firstAttribute="centerX" secondItem="i5M-Pr-FkT" secondAttribute="centerX" id="ipg-DI-rtj"/>
+                <constraint firstItem="Kik-vR-pTv" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leading" constant="30" id="nfi-yB-Sgz"/>
+                <constraint firstItem="tUq-DZ-mWD" firstAttribute="top" secondItem="zYe-GJ-2Td" secondAttribute="bottom" constant="15" id="plP-ST-KmJ"/>
+                <constraint firstItem="Kik-vR-pTv" firstAttribute="top" secondItem="h0n-zz-Hyu" secondAttribute="bottom" constant="36" id="uid-66-JNf"/>
+            </constraints>
+            <point key="canvasLocation" x="-186.40000000000001" y="10.344827586206897"/>
+        </view>
+    </objects>
+</document>

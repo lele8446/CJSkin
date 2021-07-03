@@ -1,0 +1,11 @@
+source 'https://github.com/CocoaPods/Specs.git'
+
+# use_frameworks!
+
+
+platform :ios, '9.0'
+
+target 'CJSkin' do
+  pod 'CJSkin', :path => '../../'
+  pod 'CJFileDownloader'
+end
