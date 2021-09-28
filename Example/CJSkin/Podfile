@@ -7,5 +7,5 @@ platform :ios, '9.0'
 
 target 'CJSkin' do
   pod 'CJSkin', :path => '../../'
-  pod 'CJFileDownloader'
+#  pod 'CJFileDownloader'
 end
