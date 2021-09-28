@@ -49,7 +49,7 @@ button.titleLabel.font = SkinFont(@"标题");
 
 ![CJSkin.plist](https://lele8446infoq.oss-cn-shenzhen.aliyuncs.com/cjskin/CJSkin.png)
 
-另外项目中还有 `default.bundle`、 `skin1.bundle`、 `skin2.bundle` 等文件夹，分别用于存储不同皮肤包下各自的图片，并且 **.bundle**文件夹名字要与CJSkin.plist中配置的皮肤包名对应。default.bundle存储的是默认皮肤资源，你也可以不加入default.bundle而是把图片存储在 **Assets.xcassets** 中，但CJSkin.plist中 **default **皮肤的配置说明不能缺失。
+另外项目中还有 `default.bundle`、 `skin1.bundle`、 `skin2.bundle` 等文件夹，分别用于存储不同皮肤包下各自的图片，并且 **.bundle**文件夹名字要与CJSkin.plist中配置的皮肤包名对应。default.bundle存储的是默认皮肤资源，你也可以不加入default.bundle而是把图片存储在 **Assets.xcassets** 中，但CJSkin.plist中 **default** 皮肤的配置说明不能缺失。
 
 - 不同皮肤包 **Color** 字典中的key相同值不同：比如default皮肤包中 `导航背景色` 值为0x996666，skin2皮肤包中 `导航背景色` 的值为0x454545。
 - **Image** 的说明同理，比如default和skin2皮肤包都在CJSkin.plist中对图片 `顶部图片` 进行了配置说明，它们分别指向了不同的在线url；不同皮肤包的图片还可以放到各自的 **.bundle** 文件夹内，同时在CJSkin.plist中声明图片别名。比如skin1.bundle中包含图片top@2x.png、top@3x.png，它在CJSkin.plist的配置为  `{"Image":{"顶部图片":"top.png"}} `，也可以CJSkin.plist中不做配置，而是在获取图片的时候key直接等于 **skin1.bundle**文件夹中存储的图片名 **top**。
