@@ -44,10 +44,18 @@ static KsetUpDecodeSkinPlistBlock _decodeSkinPlistBlock = nil;
 @property (nonatomic, copy) NSDictionary *skinInfo;
 /** 读取CJSkin.plist文件解密内容的block*/
 @property (class, copy) KsetUpDecodeSkinPlistBlock decodeSkinPlistBlock;
+/** 皮肤资源为网络图片，图片下载成功后对应的图片内存缓存*/
+@property (nonatomic, strong) NSCache *imageCache;
 @end
 
 @implementation CJSkin
-
+- (NSCache *)imageCache {
+    if (!_imageCache) {
+        _imageCache = [[NSCache alloc]init];
+        _imageCache.countLimit = 50;
+    }
+    return _imageCache;
+}
 + (KsetUpDecodeSkinPlistBlock)decodeSkinPlistBlock {
     return _decodeSkinPlistBlock;
 }
@@ -159,7 +167,7 @@ static KsetUpDecodeSkinPlistBlock _decodeSkinPlistBlock = nil;
     [info writeToFile:self.skinSandboxPlistPath atomically:YES];
 }
 
-+ (void)loadSkinInfoFromBundle:(BOOL)fromBundle {
++ (void)loadSkinInfoFromBundle {
 #if (DEBUG)
     NSString *appVersion = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"];
     if (appVersion.length == 0) {
@@ -457,7 +465,10 @@ static KsetUpDecodeSkinPlistBlock _decodeSkinPlistBlock = nil;
                     [CJSkin changeSkinWithName:CJ_SKIN_DEFAULT_NAME resultBlock:nil];
                 }
                 //删除该皮肤包对应的网络图片
-                [[CJFileDownloader manager]clearCacheAtCustomCachePath:SkinCachePath(skinName) resultBlock:nil];
+                //删除以皮肤压缩包zip方式整体下载的对应皮肤图片：Library/Caches/CJSkin/skinName 目录下的图片
+                [self clearImageCachePath:SkinCachePath(skinName) completion:nil];
+                //删除指定url方式下载的在线图片： Library/Caches/CJSkin/CJSkinImage/skinName 目录下的图片
+                [self clearImageCachePath:SkinCachePath([NSString stringWithFormat:@"CJSkinImage/%@",skinName]) completion:nil];
             }
         }
     }else{
@@ -477,4 +488,59 @@ static KsetUpDecodeSkinPlistBlock _decodeSkinPlistBlock = nil;
     return result;
 }
 
++ (void)clearCachePath:(NSString *)path completion:(void(^)(BOOL result, NSString *str))completion {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error;
+        if ([[NSFileManager defaultManager] removeItemAtPath:path error:&error]) {
+            if (completion) {
+                NSString *msg = [NSString stringWithFormat:@"清除缓存成功"];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(YES,msg);
+                });
+            }
+        }else{
+            if (completion) {
+                NSString *msg = [NSString stringWithFormat:@"清除缓存出错：%@",error.localizedDescription];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(NO,msg);
+                });
+            }
+        }
+    });
+}
+
++ (void)clearImageCachePath:(NSString *)path completion:(void(^)(BOOL result, NSString *str))completion {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+            NSError *error;
+            NSString *parentPath = [path stringByDeletingLastPathComponent];
+            NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:parentPath error:&error];
+            if (error) {
+                [self clearCachePath:path completion:completion];
+            }else{
+                if (files.count == 1) {
+                    [self clearCachePath:parentPath completion:completion];
+                }else{
+                    [self clearCachePath:path completion:completion];
+                }
+            }
+        }else{
+            if (completion) {
+                completion(YES,@"在线皮肤图片缓存为空");
+            }
+        }
+    });
+}
+
++ (void)clearAllSkinImageCache:(void(^)(BOOL result, NSString *str))completion {
+    // CJSkinImageCahcePathName = "CJSkinImage"
+    NSString *path = SkinCachePath(@"CJSkinImage");
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        [self clearCachePath:path completion:completion];
+    }else{
+        if (completion) {
+            completion(YES,@"在线皮肤图片缓存为空");
+        }
+    }
+}
 @end

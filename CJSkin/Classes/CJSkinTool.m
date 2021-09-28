@@ -26,6 +26,9 @@ static NSString * const CJSkinFontSizeKey                 = @"Size";
 
 #define CJSkinImageErrorCode    -29999
 
+/// 沙盒中记录所有在线图片缓存的文件夹名称
+#define CJSkinImageCahcePathName    @"CJSkinImage"
+
 /**
  十六进制字符串转数字
  
@@ -66,7 +69,7 @@ static force_inline id SkinPackValueForKey(NSDictionary *info, NSString *key, CJ
 }
 /**不同皮肤包下的缓存路径 */
 FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
-    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,NSUserDomainMask,YES);
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,NSUserDomainMask,YES);
     NSString *path = [paths objectAtIndex:0];
     NSString *skinImageCachePathName = @"CJSkin";
     if (skinName.length > 0) {
@@ -76,6 +79,12 @@ FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     [fileManager createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     return path;
+}
+
+/** 皮肤资源为网络图片，图片下载成功后对应的图片内存缓存*/
+FOUNDATION_EXPORT NSCache* SkinImageCache() {
+    NSCache *imageCache = [CJSkin.manager valueForKey:@"imageCache"];
+    return imageCache;
 }
 
 @interface CJSkinTool () {
@@ -123,8 +132,10 @@ FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
 
 + (CJSkinTool *)skinToolWithKey:(NSString *)key type:(CJSkinValueType)type {
     CJSkinTool *skinTool = [[CJSkinTool alloc]initWithKey:key valueType:type];
-    CJSkinTool *defaultSkinTool = [CJSkinTool defaultSkinToolWithKey:key type:type];
-    skinTool.defaultValue = [defaultSkinTool skinValue];
+    if (type != CJSkinValueTypeImage) {
+        CJSkinTool *defaultSkinTool = [CJSkinTool defaultSkinToolWithKey:key type:type];
+        skinTool.defaultValue = [defaultSkinTool skinValue];
+    }
     return skinTool;
 }
 
@@ -145,8 +156,12 @@ FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
         skinValue = SkinPackValueForKey(skinInfo, key, CJSkinValueTypeFont);
     }
     else if (type == CJSkinValueTypeImage) {
-        NSString *imageUrl = SkinPackValueForKey(skinInfo,key,CJSkinValueTypeImage);
-        skinValue = [CJSkinTool skinImageForKey:key skinName:[CJSkin manager].skinName imageUrl:imageUrl];
+        CJSkinTool *skinTool = [CJSkinTool skinToolWithKey:key type:CJSkinValueTypeImage];
+        skinValue = [skinTool getSkinImageForKey:key skinInfo:[CJSkin manager].skinInfo skinName:[CJSkin manager].skinName readDefaultValue:NO needDownload:NO completionHandler:^(BOOL result, NSString *message, NSString *skinName, UIImage *image, BOOL networkImage) {
+        }];
+        
+//        NSString *imageUrl = SkinPackValueForKey(skinInfo,key,CJSkinValueTypeImage);
+//        skinValue = [CJSkinTool skinImageForKey:key skinName:[CJSkin manager].skinName imageUrl:imageUrl];
     }
     else if (type == CJSkinValueTypeImageFromColor) {
         skinValue = SkinPackValueForKey(skinInfo, key, CJSkinValueTypeColor);
@@ -166,7 +181,9 @@ FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
         value = [self skinFontForKey:self.key];
     }
     else if (self.valueType == CJSkinValueTypeImage) {
-        value = [self skinImageForKey:self.key];;
+        value = [self skinImageForKey:self.key skinInfo:CJSkin.manager.skinInfo skinName:CJSkin.manager.skinName];
+        
+//        value = [self skinImageForKey:self.key];
     }
     else if (self.valueType == CJSkinValueTypeImageFromColor) {
         value = [self skinImageFromColorForKey:self.key];;
@@ -292,103 +309,233 @@ FOUNDATION_EXPORT NSString* SkinCachePath(NSString *skinName) {
     return image;
 }
 
-/** 获取图片 */
-- (id)skinImageForKey:(NSString *)key {
-    NSDictionary *skinInfo = [CJSkin manager].skinInfo;
-    NSString *skinName = [CJSkin manager].skinName;
-    if (self.isDefaultSkin) {
-        skinInfo = [CJSkin manager].defaultSkinInfo;
-        skinName = [CJSkin manager].defaultSkinName;
+///TODO: 获取图片
+/// 获取图片
+- (id)skinImageForKey:(NSString *)key skinInfo:(NSDictionary *)skinInfo skinName:(NSString *)skinName {
+    UIImage *image = [self getSkinImageForKey:key skinInfo:skinInfo skinName:skinName readDefaultValue:YES needDownload:YES completionHandler:^(BOOL result, NSString *message, NSString *skinName, UIImage *image, BOOL networkImage) {
+//        if (result && [skinName isEqualToString:[CJSkin skinName]] && networkImage) {
+//
+//        }
+    }];
+    if (self.imageRenderingMode >= 0 && [image isKindOfClass:[UIImage class]]) {
+        image = [image imageWithRenderingMode:self.imageRenderingMode];
     }
-    NSString *imageUrl = SkinPackValueForKey(skinInfo,key,CJSkinValueTypeImage);
-    id image = [CJSkinTool skinImageForKey:key skinName:skinName imageUrl:imageUrl];
-    if (!image) {
-        image = self.defaultValue;
-        if (!image) {
-#if defined(DEBUG) && DEBUG
-            if (self.isDefaultSkin && ![CJSkinTool imagePathIsUrl:key]) {
-                NSLog(@"CJSkin 当前皮肤包：%@， 获取图片、默认图片均不存在：%@，defaultValue取 [UIImage new]",skinName,key);
+    return image;
+}
+- (id)getSkinImageForKey:(NSString *)key
+                skinInfo:(NSDictionary *)skinInfo
+                skinName:(NSString *)skinName
+        readDefaultValue:(BOOL)readDefaultValue
+            needDownload:(BOOL)needDownload
+       completionHandler:(void(^)(BOOL result, NSString* message, NSString* skinName, UIImage* image, BOOL networkImage))completionHandler {
+    //从内存缓存NSCache读取
+    UIImage *image = [SkinImageCache() objectForKey:[self imageCacheKey:key skinName:skinName]];
+    if (image) {
+        completionHandler(YES,@"获取图片成功",skinName,image,NO);
+        return image;
+    }
+    
+    //判断CJSkin.plist记录的皮肤信息包中是否存在该图片信息，如果没有，图片名取key
+    NSString *imageName = SkinPackValueForKey(skinInfo,key,CJSkinValueTypeImage);
+    if (!imageName || imageName.length == 0) {
+        imageName = key;
+    }
+    
+    /// 图片无需下载，图片引入包含3种方式：
+    /// 1、默认皮肤包，Assets.xcassets内或直接放在项目工程下
+    /// 2、其他皮肤包，项目初始化阶段以skin1.bundle的形式导入
+    /// 3、在线下载的皮肤压缩包，解压后存储在：Library/Caches/CJSkin/皮肤包名/xxx.png路径下
+    if (![CJSkinTool imagePathIsUrl:imageName]) {
+        //默认皮肤包，首先从Assets.xcassets或项目工程中读取图片
+        if ([skinName isEqualToString:CJ_SKIN_DEFAULT_NAME]) {
+            image = [UIImage imageNamed:imageName];
+            if (image) {
+                completionHandler(YES,@"获取图片成功",skinName,image,NO);
+                return image;
             }
-#endif
-            image = [self getImageFromColor:[UIColor whiteColor] size:CGSizeMake(0.1, 0.1)];
-        }else{
-            if ([image isKindOfClass:[UIImage class]]) {
-                if (self.imageRenderingMode >= 0) {
-                    image = [image imageWithRenderingMode:self.imageRenderingMode];
-                }
-            }
-            NSLog(@"CJSkin 当前皮肤包：%@， 图片不存在：%@，降级读取 defaultValue 成功",skinName,key);
         }
-    }else{
-        if ([image isKindOfClass:[UIImage class]]) {
-            if (self.imageRenderingMode >= 0) {
-                image = [image imageWithRenderingMode:self.imageRenderingMode];
+        
+        //再从 Bundle 文件夹读取图片
+        NSString *skinBundlePath = [[NSBundle mainBundle] pathForResource:skinName ofType:@"bundle"];
+        NSBundle *skinBundle = [NSBundle bundleWithPath:skinBundlePath];
+        if (skinBundle) {
+            NSString *imageNameStr = [NSString stringWithFormat:@"%@.bundle/%@",skinName,imageName];
+            image = [UIImage imageNamed:imageNameStr];
+            if (image) {
+                completionHandler(YES,@"获取图片成功",skinName,image,NO);
+                return image;
             }
+        }
+        
+        //在线下载的皮肤压缩包，从沙盒路径读取：Library/Caches/CJSkin/皮肤包名/xxx.png
+        if (imageName.length > 1 && [[imageName substringToIndex:1] isEqualToString:@"/"]) {
+            imageName = [imageName substringFromIndex:1];
+        }
+        NSString *localFilePath = SkinCachePath(skinName);
+        image = [self getImageFromLocalPath:localFilePath skinName:skinName key:key imageName:imageName];
+        if (image) {
+            completionHandler(YES,@"获取图片成功",skinName,image,NO);
+            return image;
+        }
+        
+        completionHandler(NO,@"皮肤图片不存在",skinName,image,NO);
+    }
+    ///CJSkin.plist记录的皮肤信息包中，该图片是需要在线下载的图片
+    else{
+        //判断缓存是否存在
+        //查找指定url是否存在沙盒缓存，默认一个url对应的缓存路径下只会有一份文件，如果存在多个则认为缓存无效并删除
+        NSString *localFilePath = [[CJFileDownloader manager]cacheFilePathWithUrl:[NSURL URLWithString:imageName] customCachePath:SkinCachePath([NSString stringWithFormat:@"%@/%@",CJSkinImageCahcePathName,skinName])];
+        if (localFilePath.length > 0) {
+            //此处的localFilePath应该是包含具体文件名（含后缀）的缓存路径，因此获取图片imageName=""
+            image = [self getImageFromLocalPath:localFilePath skinName:skinName key:key imageName:@""];
+            if (image) {
+                completionHandler(YES,@"获取图片成功",skinName,image,NO);
+                return image;
+            }
+        }
+        //未下载成功的网络图片，开始下载逻辑判断
+        else {
+            if (needDownload) {
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                    /// TODO: 开始下载
+                    NSString *cachePath = SkinCachePath([NSString stringWithFormat:@"%@/%@",CJSkinImageCahcePathName,skinName]);
+                    [self downloadImage:imageName cachePath:cachePath result:^(BOOL success, NSString *imagePath, NSError *error) {
+                        if (success) {
+                            UIImage *resultImage = [self getImageFromLocalPath:imagePath skinName:skinName key:key imageName:@""];
+                            if (resultImage) {
+                                dispatch_async(dispatch_get_main_queue(), ^{
+                                    completionHandler(YES,@"下载图片成功",skinName,resultImage,YES);
+                                });
+                            }else{
+                                dispatch_async(dispatch_get_main_queue(), ^{
+                                    completionHandler(NO,@"下载图片后解析出错",skinName,nil,YES);
+                                });
+                            }
+                        }else{
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                completionHandler(NO,error.localizedDescription,skinName,nil,YES);
+                            });
+                        }
+                    }];
+                });
+            }
+            else {
+                //只是判断当前皮肤包是否存在指定图片，无需下载，只需返回空图片即可
+                image = nil;
+                completionHandler(NO,@"皮肤图片未下载",skinName,nil,YES);
+            }
+        }
+    }
+    
+    //降级读取默认皮肤包资源
+    if (readDefaultValue) {
+        if (![skinName isEqualToString:CJ_SKIN_DEFAULT_NAME]) {
+            image = [self getSkinImageForKey:key skinInfo:CJSkin.manager.defaultSkinInfo skinName:CJSkin.manager.defaultSkinName readDefaultValue:readDefaultValue needDownload:needDownload completionHandler:^(BOOL result, NSString *message, NSString *skinName, UIImage *image, BOOL networkImage) {
+            }];
+#if defined(DEBUG) && DEBUG
+            NSLog(@"ZWTSkin 当前皮肤包：%@，图片资源不存在，降级读取 defaultValue，key= %@",skinName,key);
+#endif
+        }
+        //如果已经是默认皮肤包，返回UIImage.init()
+        else{
+            image = [self getImageFromColor:[UIColor whiteColor] size:CGSizeMake(0.1, 0.1)];
+#if defined(DEBUG) && DEBUG
+            NSLog(@"ZWTSkin 当前皮肤包：%@，图片资源不存在，defaultValue取 UIImage.init()，key= %@",skinName,key);
+#endif
+        }
+    }
+    
+    return image;
+}
+
+- (UIImage *)getImageFromLocalPath:(NSString *)imagePath skinName:(NSString *)skinName key:(NSString *)key imageName:(NSString *)imageName {
+    NSString* imageFilePath = [self imageExists:imagePath imageName:imageName];
+    if (imageFilePath.length == 0) {
+        return nil;
+    }
+    UIImage *image = nil;
+    if ([self strContainsIgnoringCase:imageFilePath find:@"@1x.png"] ||
+        [self strContainsIgnoringCase:imageFilePath find:@"@2x.png"] ||
+        [self strContainsIgnoringCase:imageFilePath find:@"@3x.png"]) {
+        imageFilePath = [imageFilePath stringByReplacingOccurrencesOfString:@"@1x" withString:@""];
+        imageFilePath = [imageFilePath stringByReplacingOccurrencesOfString:@"@2x" withString:@""];
+        imageFilePath = [imageFilePath stringByReplacingOccurrencesOfString:@"@3x" withString:@""];
+        image = [[UIImage alloc]initWithContentsOfFile:imageFilePath];
+        if (image) {
+            //将图片加入内存缓存
+            [SkinImageCache() setObject:image forKey:[self imageCacheKey:key skinName:skinName]];
+        }
+    }
+    else{
+        
+        NSData *data = [NSData dataWithContentsOfURL:[NSURL fileURLWithPath:imageFilePath] options:NSDataReadingMappedIfSafe error:nil];
+        image = [UIImage imageWithData:data scale:[UIScreen mainScreen].scale];
+        if (image) {
+            //将图片加入内存缓存
+            [SkinImageCache() setObject:image forKey:[self imageCacheKey:key skinName:skinName]];
+        }else{
+            //获取沙盒缓存图片失败，删除无效缓存
+            [self deleteLocalImageFile:imageFilePath];
         }
     }
     return image;
 }
-/** 从指定皮肤包获取图片 */
-+ (UIImage *)skinImageForKey:(NSString *)key skinName:(NSString *)skinName imageUrl:(NSString *)imageUrl {
-    UIImage *image = nil;
-    NSString *oldImageUrl = imageUrl;
-    NSString *skinBundlePath = [[NSBundle mainBundle] pathForResource:skinName ofType:@"bundle"];
-    NSBundle *skinBundle = [NSBundle bundleWithPath:skinBundlePath];
-    if (skinBundle) {
-        NSString *imageName = [NSString stringWithFormat:@"%@.bundle/%@",skinName,key];
-        image = [UIImage imageNamed:imageName];
-        if (!image) {
-            NSString *imageName = [NSString stringWithFormat:@"%@.bundle/%@",skinName,imageUrl];
-            image = [UIImage imageNamed:imageName];
+- (NSString *)imageCacheKey:(NSString *)key skinName:(NSString *)skinName {
+    return [NSString stringWithFormat:@"%@_%@",skinName,key];
+}
+- (void)deleteLocalImageFile:(NSString *)imagePath {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSURL *path = [[NSURL alloc]initFileURLWithPath:imagePath];
+        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:imagePath error:nil];
+        if (files && files.count == 1) {
+            path = [path URLByDeletingLastPathComponent];
         }
-    }
-    
-    // 处理图片z地址为http链接，或者图片是从下载的整体皮肤压缩包里读取的情况
-    if (!image && imageUrl.length > 0) {
-        if ([self imagePathIsUrl:imageUrl]) {
-            NSString *imageFilePath = [[CJFileDownloader manager]cacheFilePathWithUrl:[NSURL URLWithString:imageUrl] customCachePath:SkinCachePath(skinName)];
-            if (imageFilePath.length > 0) {
-//                image = [UIImage imageWithContentsOfFile:imageUrl];
-                NSURL *imageFilePathURL = [NSURL fileURLWithPath:imageFilePath];
-                NSData *imgData = [NSData dataWithContentsOfURL:imageFilePathURL options:NSDataReadingMappedIfSafe error:nil];
-                image = [UIImage imageWithData:imgData scale:[UIScreen mainScreen].scale];
-#if defined(DEBUG) && DEBUG
-                if (!image) {
-                    NSLog(@"CJSkin 当前皮肤包：%@， 获取图片出错：%@，缓存路径：%@",skinName,key,imageFilePath);
+        [[NSFileManager defaultManager] removeItemAtURL:path error:nil];
+    });
+}
+- (NSString *)imageExists:(NSString *)path imageName:(NSString *)imageName {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    BOOL isDir = NO;
+    if ([fileManager fileExistsAtPath:path isDirectory:&isDir]) {
+        if (isDir) {
+            NSArray *files = [fileManager contentsOfDirectoryAtPath:path error:nil];
+            NSString *imagePath = @"";
+            for (NSString *file in files) {
+                if ([self strContainsIgnoringCase:file find:imageName]) {
+                    imagePath = [NSString stringWithFormat:@"%@/%@",path,file];
+                    break;
                 }
-#endif
             }
+            return imagePath;
         }else{
-            if (imageUrl.length > 1 && [[imageUrl substringToIndex:1] isEqualToString:@"/"]) {
-                imageUrl = [imageUrl substringFromIndex:1];
-            }
-            imageUrl = [NSString stringWithFormat:@"%@/%@",SkinCachePath([CJSkin manager].skinName),imageUrl];
-            image = [UIImage imageWithContentsOfFile:imageUrl];
-            NSData *imgData = nil;
-            if (!image) {
-                NSURL *imageFilePathURL = [NSURL fileURLWithPath:imageUrl];
-                imgData = [NSData dataWithContentsOfURL:imageFilePathURL options:NSDataReadingMappedIfSafe error:nil];
-            }else{
-                imgData = UIImagePNGRepresentation(image);
-            }
-            if (imgData) image = [UIImage imageWithData:imgData scale:[UIScreen mainScreen].scale];
+            return path;
         }
+    }else{
+        return @"";
     }
-    //默认default 皮肤包还会读取 Assets.xcassets 以及项目主工程中的图片
-    if (!image && [skinName isEqualToString:[CJSkin manager].defaultSkinName]) {
-            image = [UIImage imageNamed:key];
-            if (!image) {
-                if (oldImageUrl.length > 0) {
-                   image = [UIImage imageNamed:oldImageUrl];
-                }
+}
+- (BOOL)strContainsIgnoringCase:(NSString *)str find:(NSString *)find {
+    NSRange range = [str rangeOfString:find options:NSCaseInsensitiveSearch];
+    if (range.location != NSNotFound && range.length != 0) {
+        return YES;
+    }
+    return NO;
+}
+- (void)downloadImage:(NSString *)imageURLStr cachePath:(NSString *)cachePath result:(void(^)(BOOL success, NSString *imagePath, NSError *error))result {
+    NSURL *imageURL = [NSURL URLWithString:imageURLStr];
+    [[CJFileDownloader manager]CJFileDownLoadWithUrl:imageURL parameters:nil cookies:nil cachePolicy:NSURLRequestUseProtocolCachePolicy  customCachePath:cachePath taskIdentifier:nil progress:nil success:^(id taskIdentifier, BOOL cache, NSURLResponse *response, NSURL *filePath, NSString *MIMEType) {
+        if (result) {
+            NSString *filePathStr = filePath.absoluteString;
+            if ([filePathStr hasPrefix:@"file://"]) {
+                filePathStr = [filePathStr stringByReplacingOccurrencesOfString:@"file://" withString:@""];
             }
-    }
-#if defined(DEBUG) && DEBUG
-    if (!image) {
-        NSLog(@"CJSkin 当前皮肤包：%@， 获取从压缩包下载的图片出错，图片路径%@",skinName,imageUrl);
-    }
-#endif
-    return image;
+            result(YES,filePathStr,nil);
+        }
+    } failure:^(id taskIdentifier, NSInteger statusCode, NSError *error) {
+        if (result) {
+            result(NO,nil,error);
+        }
+    }];
 }
 + (BOOL)imagePathIsUrl:(NSString *)str {
     if (str == nil || str.length == 0) return NO;
@@ -476,10 +623,11 @@ FOUNDATION_EXPORT UIColor* SkinColorAlpha(NSString *key, CGFloat alpha) {
 - (BOOL)needDownloadImage {
     BOOL needDownload = NO;
     if (self.valueType == CJSkinValueTypeImage) {
-        NSDictionary *skinInfo = self.isDefaultSkin?[CJSkin manager].defaultSkinInfo:[CJSkin manager].skinInfo;
+        NSDictionary *skinInfo = [CJSkin manager].skinInfo;
         NSString *imageUrl = SkinPackValueForKey(skinInfo,self.key,CJSkinValueTypeImage);
         if (imageUrl.length > 0 && [CJSkinTool imagePathIsUrl:imageUrl]) {
-            NSString *imageFilePath = [[CJFileDownloader manager]cacheFilePathWithUrl:[NSURL URLWithString:imageUrl] customCachePath:SkinCachePath([CJSkin manager].skinName)];
+            //查找指定url是否存在沙盒缓存，默认一个url对应的缓存路径下只会有一份文件，如果存在多个则认为缓存无效并删除
+            NSString *imageFilePath = [[CJFileDownloader manager]cacheFilePathWithUrl:[NSURL URLWithString:imageUrl] customCachePath:SkinCachePath([NSString stringWithFormat:@"%@/%@",CJSkinImageCahcePathName,[CJSkin manager].skinName])];
             if (imageFilePath.length > 0) {
                 needDownload = NO;
             }else{
@@ -509,113 +657,18 @@ FOUNDATION_EXPORT UIColor* SkinColorAlpha(NSString *key, CGFloat alpha) {
 }
 
 - (void)downloadImageWithNoticInfo:(NSDictionary *)noticInfo resultBlock:(void(^)(BOOL success, NSError *error, UIImage *image))resultBlock {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        if (self.valueType == CJSkinValueTypeImage) {
-            NSDictionary *skinInfo = [CJSkin manager].skinInfo;
-            NSString *skinName = [CJSkin manager].skinName;
-            if (self.isDefaultSkin) {
-                skinInfo = [CJSkin manager].defaultSkinInfo;
-                skinName = [CJSkin manager].defaultSkinName;
-            }
-            NSString *imagePath = SkinPackValueForKey(skinInfo,self.key,CJSkinValueTypeImage);
-            if ([CJSkinTool imagePathIsUrl:imagePath]) {
-                [self downloadImageSkinName:skinName key:self.key imageURLStr:imagePath result:^(BOOL success, NSError *error) {
-                    if (success) {
-                        if (resultBlock) {
-                            [self getImageCacheWithSkinName:skinName imageURLStr:imagePath resultBlock:^(BOOL success, NSError *error, UIImage *image) {
-                                resultBlock(success,error,image);
-                            }];
-                        }
-                    }else{
-                        if (resultBlock) {
-                            resultBlock(NO,error,nil);
-                        }
-                    }
-                    if (noticInfo) {
-                        self.imageAlreadyDownloadedSkin = YES;
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [[NSNotificationCenter defaultCenter] postNotificationName:CJSkinImageHaveDownloadedNotification object:noticInfo];
-                        });
-                    }
-                }];
-            }else{
-                if (imagePath.length > 1 && [[imagePath substringToIndex:1] isEqualToString:@"/"]) {
-                    imagePath = [imagePath substringFromIndex:1];
-                }
-                imagePath = [NSString stringWithFormat:@"%@/%@",SkinCachePath([CJSkin manager].skinName),imagePath];
-                NSURL *imageFilePathURL = [NSURL fileURLWithPath:imagePath];
-                NSData *imgData = [NSData dataWithContentsOfURL:imageFilePathURL options:NSDataReadingMappedIfSafe error:nil];
-                UIImage *image = [UIImage imageWithData:imgData scale:[UIScreen mainScreen].scale];
-                BOOL result = YES;
-                NSError *error = nil;
-                NSString *errorStr = nil;
-                if (!image) {
-                    result = NO;
-                    errorStr = [NSString stringWithFormat:@"CJSkin 从指定皮肤资源路径读取图片失败，皮肤包：%@，图片key：%@，图片路径：%@",skinName,self.key,imagePath];
-                    NSLog(@"%@",errorStr);
-                    error = [NSError errorWithDomain:NSURLErrorDomain code:CJSkinImageErrorCode userInfo:@{NSLocalizedDescriptionKey:errorStr}];
-                }
-                if (resultBlock) {
-                    resultBlock(result,error,image);
-                }
-                if (noticInfo) {
-                    self.imageAlreadyDownloadedSkin = YES;
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [[NSNotificationCenter defaultCenter] postNotificationName:CJSkinImageHaveDownloadedNotification object:noticInfo];
-                    });
-                }
-            }
+    [self getSkinImageForKey:self.key skinInfo:CJSkin.manager.skinInfo skinName:CJSkin.manager.skinName readDefaultValue:NO needDownload:YES completionHandler:^(BOOL result, NSString *message, NSString *skinName, UIImage *image, BOOL networkImage) {
+        if (resultBlock) {
+            NSError *error = [NSError errorWithDomain:NSURLErrorDomain code:CJSkinImageErrorCode userInfo:@{NSLocalizedDescriptionKey:message}];
+            resultBlock(result,error,image);
         }
-    });
-}
-- (void)downloadImageSkinName:(NSString *)skinName key:(NSString *)key imageURLStr:(NSString *)imageURLStr result:(void(^)(BOOL success, NSError *error))result {
-    NSURL *imageURL = [NSURL URLWithString:imageURLStr];
-    [[CJFileDownloader manager]CJFileDownLoadWithUrl:imageURL parameters:nil cookies:nil cachePolicy:NSURLRequestUseProtocolCachePolicy  customCachePath:SkinCachePath(skinName) taskIdentifier:nil progress:nil success:^(id taskIdentifier, BOOL cache, NSURLResponse *response, NSURL *filePath, NSString *MIMEType) {
-        if (result) {
-            NSError *error = nil;
-            NSData *imgData = [NSData dataWithContentsOfURL:filePath options:NSDataReadingMappedIfSafe error:&error];
-            UIImage *image = [UIImage imageWithData:imgData];
-            BOOL success = YES;
-            if (!image) {
-                NSString *errorStr = [NSString stringWithFormat:@"CJSkin 图片下载后获取图片出错，皮肤包：%@，图片key：%@，缓存路径：%@,\n%@",skinName,self.key,filePath.absoluteString,error.localizedDescription];
-                NSLog(@"%@",errorStr);
-                error = [NSError errorWithDomain:NSURLErrorDomain code:CJSkinImageErrorCode userInfo:@{NSLocalizedDescriptionKey:errorStr}];
-                success = NO;
-                [[CJFileDownloader manager] clearCacheWithUrl:imageURL customCachePath:SkinCachePath(skinName) resultBlock:nil];
-            }
-            result(success,error);
-        }
-    } failure:^(id taskIdentifier, NSInteger statusCode, NSError *error) {
-        NSLog(@"CJSkin 图片下载失败：%@，皮肤包名：%@，error = %@",key,skinName,error);
-        if (result) {
-            result(NO,error);
+        if (noticInfo) {
+            self.imageAlreadyDownloadedSkin = YES;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] postNotificationName:CJSkinImageHaveDownloadedNotification object:noticInfo];
+            });
         }
     }];
-}
-//从本地缓存中获取图片
-- (void)getImageCacheWithSkinName:(NSString *)skinName imageURLStr:(NSString *)imageURLStr resultBlock:(void(^)(BOOL success, NSError *error, UIImage *image))resultBlock {
-    NSString *imageFilePath = [[CJFileDownloader manager]cacheFilePathWithUrl:[NSURL URLWithString:imageURLStr] customCachePath:skinName];
-    BOOL result = YES;
-    UIImage *image = nil;
-    NSError *error = nil;
-    NSString *errorStr = nil;
-    if (imageFilePath.length > 0) {
-        NSURL *imageFilePathURL = [NSURL fileURLWithPath:imageFilePath];
-        NSData *imgData = [NSData dataWithContentsOfURL:imageFilePathURL options:NSDataReadingMappedIfSafe error:nil];
-        image = [UIImage imageWithData:imgData scale:[UIScreen mainScreen].scale];
-        if (!image) {
-            result = NO;
-            errorStr = [NSString stringWithFormat:@"CJSkin 下载后读取图片失败，皮肤包：%@，图片key：%@，缓存路径：%@",skinName,self.key,imageFilePath];
-            NSLog(@"%@",errorStr);
-            error = [NSError errorWithDomain:NSURLErrorDomain code:CJSkinImageErrorCode userInfo:@{NSLocalizedDescriptionKey:errorStr}];
-        }
-    }else{
-        result = NO;
-        errorStr = [NSString stringWithFormat:@"CJSkin 图片下载失败，皮肤包：%@，图片key：%@，图片地址：%@",skinName,self.key,imageURLStr];
-        NSLog(@"%@",errorStr);
-        error = [NSError errorWithDomain:NSURLErrorDomain code:CJSkinImageErrorCode userInfo:@{NSLocalizedDescriptionKey:errorStr}];
-    }
-    resultBlock(result,error,image);
 }
 @end
 FOUNDATION_EXPORT UIImage* SkinImage(NSString *key) {

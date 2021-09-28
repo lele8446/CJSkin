@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'CJSkin'
-  s.version          = '1.0.1'
+  s.version          = '1.0.2'
   s.summary          = 'CJSkin动态换肤框架，支持图片、颜色、字体等元素的动态切换以及皮肤包在线更新'
 
 # This description is used to generate tags and improve search results.

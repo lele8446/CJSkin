@@ -16,7 +16,7 @@ PODS:
     - AFNetworking/NSURLSession
   - CJFileDownloader (1.0.0):
     - AFNetworking
-  - CJSkin (1.0.0):
+  - CJSkin (1.0.2):
     - CJFileDownloader
     - SSZipArchive
   - SSZipArchive (2.4.2)
@@ -38,7 +38,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AFNetworking: 7864c38297c79aaca1500c33288e429c3451fdce
   CJFileDownloader: 89237397065665813089fbd9d4589af7c393c413
-  CJSkin: 37afebdebd7000e9a1ded6f578cf012e23542d9a
+  CJSkin: 166475c4893c3032f3fa6128a9e05388b28e2398
   SSZipArchive: e7b4f3d9e780c2acc1764cd88fbf2de28f26e5b2
 
 PODFILE CHECKSUM: cff97f1698a0b0969ec98267c04c62130a560730

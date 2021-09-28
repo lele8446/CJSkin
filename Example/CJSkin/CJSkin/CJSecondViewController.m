@@ -63,7 +63,7 @@
 
 - (IBAction)revertSkin:(id)sender {
     //只在DEBUG下有效
-    [CJSkin loadSkinInfoFromBundle:YES];
+    [CJSkin loadSkinInfoFromBundle];
 }
 
 @end

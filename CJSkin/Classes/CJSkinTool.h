@@ -133,11 +133,11 @@ FOUNDATION_EXPORT BOOL SkinImageExists(NSString *key);
 @interface CJSkinTool (CJSkinImage)
 /**皮肤资源为图片，是否需要下载 */
 @property (nonatomic, assign, readonly) BOOL needDownloadImage;
-/**皮肤资源为网络图片，图片对应的url */
+/**皮肤资源为网络图片，图片对应的url （可能为nil）*/
 @property (nonatomic, copy,   readonly) NSString *imageUrl;
 /**皮肤资源为图片，图片渲染模式 */
 @property (nonatomic, assign, readwrite) UIImageRenderingMode imageRenderingMode;
-/**皮肤资源为图片，当前皮肤包图片加载失败时候的默认图片（默认defaultValue对应默认皮肤包“default”中的同名资源，如果均不存在则取[UIImage new]） */
+/**皮肤资源为图片，当前皮肤包图片加载失败时候的默认图片（默认defaultValue对应默认皮肤包“default”中的同名资源，如果均不存在则取[UIImage new]）；当前皮肤包图片存在时，defaultValue=nil */
 @property (nonatomic, strong, readwrite) UIImage *defaultValue;
 /**
  异步获取皮肤包下的网络图片

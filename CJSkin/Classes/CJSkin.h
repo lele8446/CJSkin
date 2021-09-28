@@ -33,7 +33,10 @@
 
 /**
  主动设置换肤配置CJSkin.plist文件的解密内容
- 注意⚠️：必须在所有控件设置皮肤属性前调用该方法，建议在 application:willFinishLaunchingWithOptions: 或 application:didFinishLaunchingWithOptions:的第一行代码中设置
+ 
+ 针对App安全保密性要求，可在项目编译之前通过脚本将CJSkin.plist文件进行加密，再在App启动执行时调用该方法获取CJSkin.plist文件的解密内容
+ 
+ 注意⚠️：必须在所有控件设置皮肤属性前调用该方法，建议在 application:willFinishLaunchingWithOptions: 或 application:didFinishLaunchingWithOptions: 的第一行代码中设置
 
  @param setUpBlock 设置回调，返回配置对应的NSDictionary
  */
@@ -49,22 +52,21 @@
 + (BOOL)changeSkinWithName:(NSString *)skinName resultBlock:(void(^)(NSError *error))resultBlock;
 
 /**
-    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    - Example.zip
-      - CJSkin.plist
-      - newSkin
+ 下载皮肤包压缩资源并自动解压更新
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ - Example.zip
+    - CJSkin.plist
+    - newSkin
         - top.png
         - bottom.png
         - ...
-    +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    注意⚠️： 1、压缩包必须包含 CJSkin.plist 文件
-            2、假设新增皮肤包名为"newSkin"的皮肤，需要下发的皮肤资源结构示例：
-                 2.1、新建以"newSkin"命名的文件夹，将"newSkin"皮肤下的图片全部放在 "newSkin"文件夹内
-                 2.2、CJSkin.plist 文件内填写"newSkin"皮肤的配置信息，其中Image配置为{"顶部图片":"top.png","底部图片":"bottom.png"...}
-                 2.3、将"newSkin"文件夹、CJSkin.plist文件放入新建文件夹（Example），并压缩为"Example.zip"
-*/
-/**
- 下载压缩包资源并自动解压更新
+ +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 皮肤包压缩资源示例说明：
+ 1、压缩包内必须包含 CJSkin.plist 皮肤配置说明文件，“newSkin”文件夹表示新增皮肤包名称（新增皮肤包可以多个），其与CJSkin.plist处于同级文件目录下
+ 2、CJSkin.plist 文件内填写"newSkin"皮肤的配置信息，如果有多个皮肤则全部都要对应填写
+ 3、“newSkin”文件夹内放置该皮肤包的所有图片资源，如果图片有别名则在CJSkin.plist内配置说明；
+     例如：{"newSkin":{"Image":{"顶部图片":"top"}}}，key为“顶部图片”，对应的实际图片可以是top@2x.png、top@3x.png，或者top.jpeg
+ 4、将"newSkin"文件夹、CJSkin.plist文件放入新建文件夹（Example），压缩为"Example.zip"则是最终的皮肤包压缩资源
  
  @param skinZipResourceUrl    压缩包资源下载地址
  @param parameters            请求参数
@@ -96,13 +98,18 @@
 + (BOOL)removeSkinPackWithName:(NSString *)skinName resultBlock:(void(^)(NSError *error))resultBlock;
 
 /**
- 是否从main bundle内重新读取皮肤配置，若开启，可调试修改 CJSkin.plist 配置中的内容，否则从 app 沙盒内的读取配置
+ 清除所有在线皮肤图片缓存
+
+ @param completion 清除结果回调
+ */
++ (void)clearAllSkinImageCache:(void(^)(BOOL result, NSString *str))completion;
+
+/**
+ 是否从main bundle内重新读取皮肤配置，若设置，可调试修改 CJSkin.plist 配置中的内容，否则从 app 沙盒内的读取配置
  如果开启，必须在任意控件设置换肤属性前调用
  此开关只在Debug模式下有效（注意⚠️：如果组件是以lib引入，lib要判断下是不是Debug模式下包）
- 默认 NO
- @param fromBundle 调试开关
  */
-+ (void)loadSkinInfoFromBundle:(BOOL)fromBundle;
++ (void)loadSkinInfoFromBundle;
 @end
 
 
